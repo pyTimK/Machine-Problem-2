@@ -7,20 +7,23 @@ from GameObjects import Player
 from GameObjects import Game
 from GameObjects import Board
 from GameObjects import GamePiece
+
+#Initalizes all necessary variables and objects
 width,height = interface.width,interface.height
 window = pyglet.window.Window(width,height,"Battle Ship",resizable=False)
-
 game=Game('player')
-
 bongo_cats = [Bongo('bongo1.png','BONGO CAT'), Bongo('bongo2.png','SHERLOCK'), Bongo('bongo3.png','VALENTINE'), Bongo('bongo4.png','EDGAR'), Bongo('bongo5.png','JOSE RIZAL'), Bongo('bongo6.png','Douglas MacArthur'), Bongo('bongo7.png','THANOS')]
 player = Player()
 show_name=None
 chosen_hero=None
+game_over=False
 image_being_dragged=None
 human_board = Board('human',engine.grid(),50,5)
 ai_board = Board('ai',engine.grid())
-ai_board.x, ai_board.y = width-(ai_board.image.width+50),5
-game_over=False
+ai_board.sprite.x, ai_board.sprite.y = width-(ai_board.image.width+50),5
+cursor_default = window.get_system_mouse_cursor(window.CURSOR_DEFAULT)
+cursor_hand = window.get_system_mouse_cursor(window.CURSOR_HAND)
+
 #Load all Ships
 human_carrier = GamePiece('carrier', 5, 600, 20)
 human_battleship = GamePiece('battleship', 4, 700, 100)
@@ -32,35 +35,45 @@ ai_battleship = GamePiece('battleship', 4)
 ai_cruiser = GamePiece('cruiser', 3)
 ai_submarine = GamePiece('submarine', 3)
 ai_destroyer = GamePiece('destroyer', 2)
-
 human_ship_list=[human_carrier, human_battleship, human_cruiser, human_submarine, human_destroyer]
 ai_ship_list=[ai_carrier, ai_battleship, ai_cruiser, ai_submarine, ai_destroyer]
 
-cursor_default = window.get_system_mouse_cursor(window.CURSOR_DEFAULT)
-cursor_hand = window.get_system_mouse_cursor(window.CURSOR_HAND)
-
-window.set_mouse_cursor(cursor_default)
-
+def human_board_grid():
+	print('')
+	for row in human_board.grid:
+		print(row)
 
 
 def setting_ships_in_grid(setting,ship_object):
+	'''Uses engine to update the grid(list) attribute of the human board'''
 	engine.occupied = human_board.occupied_positions
 	engine.orientation = ship_object.orientation
-	x = (ship_object.x - human_board.x)//40
-	y = (human_board.image.height+human_board.x - (ship_object.y + ship_object.image.height))//40-1
+	x = (ship_object.sprite.x - human_board.sprite.x - ship_object.sprite.width//2)//40
+	y = (human_board.image.height+human_board.sprite.y - (ship_object.sprite.y + ship_object.image.height//2))//40
 
+	if ship_object.orientation=='vertical':
+		x = (ship_object.sprite.x - human_board.sprite.x - ship_object.sprite.height//2)//40
+		y = (human_board.image.height+human_board.sprite.y - (ship_object.sprite.y + ship_object.image.width//2))//40
 	if setting=='set':
-		engine.shipset(human_board.grid, (x,y), engine.orientation, ship_object.name )
+		engine.shipset(human_board.grid, (x,y), engine.orientation, ship_object.name)
+		if ship_object.orientation=='vertical':
+			for i in range(ship_object.size):
+				ship_object.coordinates.append((x,y+i))
+		else:
+			for i in range(ship_object.size):
+				ship_object.coordinates.append((x+i,y))
 	else:
-		engine.ship_unset(human_board.grid, (x,y), engine.orientation, ship_object.name )
+		engine.ship_unset(human_board.grid, (x,y), engine.orientation, ship_object.name)
+		ship_object.coordinates=[]
 
 	human_board.occupied_positions = engine.occupied
 	
 
-
+#mouse events
 @window.event
 def on_mouse_motion(x, y, dx, dy):
 	global show_name
+
 	if player.state == 'choose_player_screen':
 		for bongo_cat in bongo_cats:
 			if engine.mouse_position_is_in(bongo_cat,x,y):
@@ -73,19 +86,15 @@ def on_mouse_motion(x, y, dx, dy):
 				show_name=None
 				window.set_mouse_cursor(cursor_default)
 
-
-
 	elif player.state == 'set_ship_screen':
 		for human_ship in human_ship_list:
 			if engine.mouse_position_is_in(human_ship,x,y):
 				window.set_mouse_cursor(cursor_hand)
 				break
-
 			elif len(human_board.occupied_positions)==17 and interface.start_bg.posx<=x<=interface.start_bg.posx+interface.start_bg.box_width and interface.start_bg.posy<=y<=interface.start_bg.posy+interface.start_bg.box_height:
 				window.set_mouse_cursor(cursor_hand)
 			else:
 				window.set_mouse_cursor(cursor_default)
-
 
 	elif player.state == 'game_screen':
 		if engine.mouse_position_is_in(ai_board,x,y):
@@ -96,36 +105,33 @@ def on_mouse_motion(x, y, dx, dy):
 @window.event
 def on_mouse_release(x,y,button,modifier):
 	global image_being_dragged
+
 	if player.state == 'set_ship_screen':
 		if image_being_dragged!=None:
 			if interface.must_shade and interface.ship_shade.color==(255,255,255,100):
-				image_being_dragged.x = interface.ship_shade.posx
-				image_being_dragged.y = interface.ship_shade.posy
-
+				image_being_dragged.sprite.x = interface.ship_shade.posx + interface.ship_shade.box_width//2
+				image_being_dragged.sprite.y = interface.ship_shade.posy + interface.ship_shade.box_height//2
 				setting_ships_in_grid('set',image_being_dragged)
-
+				human_board_grid()
+				
 			else:
-				image_being_dragged.x = image_being_dragged.init_x
-				image_being_dragged.y = image_being_dragged.init_y
+				image_being_dragged.sprite.x = image_being_dragged.sprite.x
+				image_being_dragged.sprite.y = image_being_dragged.sprite.y
 
 		image_being_dragged=None
-
 	interface.must_shade=False
 
 @window.event
 def on_mouse_drag(x, y, dx, dy, button, modifiers):
 	if player.state=='set_ship_screen':
 		if button==mouse.LEFT and image_being_dragged!=None:
-			image_being_dragged.x=x-image_being_dragged.image.width//2
-			image_being_dragged.y=y-image_being_dragged.image.height//2
-
+			image_being_dragged.sprite.x=x
+			image_being_dragged.sprite.y=y
 		if engine.mouse_position_is_in(human_board,x,y) and image_being_dragged!=None:
 			interface.must_shade=True
 
 		else:
 			interface.must_shade=False
-
-
 
 @window.event
 def on_mouse_press(x,y,button,modifier):
@@ -146,27 +152,20 @@ def on_mouse_press(x,y,button,modifier):
 					image_being_dragged=human_ship
 			if image_being_dragged!=None and engine.mouse_position_is_in(human_board,x,y):
 				setting_ships_in_grid('unset',image_being_dragged)
-
-
 			if len(human_board.occupied_positions)==17 and interface.start_bg.posx<=x<=interface.start_bg.posx+interface.start_bg.box_width and interface.start_bg.posy<=y<=interface.start_bg.posy+interface.start_bg.box_height:
 				player.state='game_screen'
 				for i in range(len(human_board.occupied_positions)):
 					x, y = human_board.occupied_positions[i]
 					human_board.occupied_positions[i] = y, x
-
 				window.set_mouse_cursor(cursor_default)
 				engine.occupied = []
 				engine.ai_set_ships(ai_board,ai_ship_list)
 				for coordinate in engine.occupied:
 					y, x = coordinate
 					ai_board.occupied_positions.append((x,y))
-
-
-
 		elif player.state == 'game_screen':
-
 			if engine.mouse_position_is_in(ai_board,x,y):
-				coordinate = ((x-ai_board.x)//40,9-(y-ai_board.y)//40)
+				coordinate = ((x-ai_board.sprite.x)//40,9-(y-ai_board.sprite.y)//40)
 				if coordinate not in ai_board.attack_positions:
 					ai_board.attack_positions.append(coordinate)
 					if coordinate in ai_board.occupied_positions:
@@ -190,11 +189,6 @@ def on_mouse_press(x,y,button,modifier):
 							game_over=True
 							break
 
-				
-
-
-
-
 	if button==mouse.RIGHT:
 		if player.state =='set_ship_screen':
 			for human_ship in human_ship_list:
@@ -204,31 +198,24 @@ def on_mouse_press(x,y,button,modifier):
 						setting_ships_in_grid('unset',human_ship)
 
 					human_ship.switch_orientation()
-					human_ship.x = x-human_ship.image.width//2
-					human_ship.y = y-human_ship.image.height//2
-
-					
 
 
-		
-
+#keyboard events
 @window.event
 def on_key_press(symbol, modifiers):
 	if player.state=='home_screen':
 		player.state='choose_player_screen'
-
-
 	elif player.state =='choose_player_screen':
 		if 97<=symbol<=122 and len(player.name)<=15:
 			player.name+=chr(symbol)
-
 		elif symbol==key.SPACE and 1<=len(player.name)<=15:
 			player.name+=' '
-
 		elif symbol==key.ENTER and 1<=len(player.name):
 			player.state = 'set_ship_screen'
 
 	if symbol==key.R:
+		#Auto places all the human ships in random positions
+		###still has a bug
 		if player.state=='set_ship_screen':
 			engine.occupied = []
 			human_board.occupied_positions=[]
@@ -237,21 +224,18 @@ def on_key_press(symbol, modifiers):
 				y, x = coordinate
 				human_board.occupied_positions.append((x,y))
 
-#keyboard events
+
 @window.event
 def on_text_motion(motion):
 	if motion == key.MOTION_BACKSPACE and len(player.name)>0:
 		player.name=player.name[:-1]
 
-
-#default
 @window.event
 def on_draw():
 	window.clear()
 
 	if player.state=='home_screen':
 		interface.home_screen()
-
 
 	elif player.state=='choose_player_screen':
 		interface.choose_player_screen(bongo_cats,show_name,player.name,chosen_hero)
