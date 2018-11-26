@@ -1,4 +1,5 @@
 import random
+from GameObjects import GamePiece
 
 def grid():
     #returns a 10x10 grid
@@ -277,7 +278,18 @@ def ship_unset(board, coordinates, orientation, ship):
 
 
 def mouse_position_is_in(instance_name,x,y):
-    if instance_name.x<=x<=instance_name.x+instance_name.image.width and instance_name.y<=y<=instance_name.y+instance_name.image.height:
+    if isinstance(instance_name, GamePiece):
+        width=instance_name.image.width
+        height=instance_name.image.height
+        if instance_name.orientation=='vertical':
+            width=instance_name.image.height
+            height=instance_name.image.width
+
+        if instance_name.sprite.x - width//2 <=x<=instance_name.sprite.x+width//2 and instance_name.sprite.y - height//2<=y<=instance_name.sprite.y+height//2:
+            return True
+        else:
+            return False
+    if instance_name.sprite.x<=x<=instance_name.sprite.x+instance_name.image.width and instance_name.sprite.y<=y<=instance_name.sprite.y+instance_name.image.height:
         return True
     return False
 
@@ -295,8 +307,23 @@ def ai_set_ships(ai_board,ai_ship_list):
             orientation= ai_ship.orientation
             result = shipset(ai_board.grid, coordinates, ai_ship.orientation, ai_ship.name)
             if result == True:
-                ai_ship.x = ai_board.x+x*40
-                ai_ship.y = ai_board.y+(10-y)*40 - ai_ship.image.height
+                if ai_ship.orientation=='vertical':
+                    ai_ship.sprite.x = ai_board.sprite.x+x*40+ai_ship.image.height//2
+                    ai_ship.sprite.y = ai_board.sprite.y+(10-y)*40 - ai_ship.image.width//2
+                else:
+                    ai_ship.sprite.x = ai_board.sprite.x+x*40+ai_ship.image.width//2
+                    ai_ship.sprite.y = ai_board.sprite.y+(10-y)*40 - ai_ship.image.height//2
+                if ai_ship.orientation=='vertical':
+                    for i in range(ai_ship.size):
+                        ai_ship.coordinates.append((x,y+i))
+                else:
+                    for i in range(ai_ship.size):
+                        ai_ship.coordinates.append((x+i,y))
+                print(ai_ship.name)
+                print(ai_ship.coordinates)
+                for row in ai_board.grid:
+                    print(row)
+                print('')
                 break
 
 
